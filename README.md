@@ -1,6 +1,12 @@
 # DeepL Translation MCP Server
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 DeepL APIを使用した翻訳MCPサーバー。Claude Desktopから高品質な翻訳機能を利用できます。
+
+## デモ
+
+![DeepL Translation MCP Demo](demo.gif)
 
 ## 機能
 
@@ -20,14 +26,14 @@ DeepL APIを使用した翻訳MCPサーバー。Claude Desktopから高品質な
 ### uv を使用（推奨）
 
 ```bash
-cd /path/to/翻訳MCP
+cd /path/to/translation-mcp
 uv sync
 ```
 
 ### pip を使用
 
 ```bash
-cd /path/to/翻訳MCP
+cd /path/to/translation-mcp
 pip install -e .
 ```
 
@@ -43,7 +49,7 @@ pip install -e .
       "command": "uv",
       "args": [
         "--directory",
-        "D:\\プロジェクト\\MCP\\翻訳MCP",
+        "/path/to/translation-mcp",
         "run",
         "deepl-mcp"
       ],
