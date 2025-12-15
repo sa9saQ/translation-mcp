@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "deepl": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "D:\\project\\MCP\\translation-mcp",
+        "run",
+        "deepl-mcp"
+      ],
+      "env": {
+        "DEEPL_API_KEY": "f56dc242-ef1c-4d06-b1b1-2923fd9d7734:fx"
+      }
+    }
+  }
+}
