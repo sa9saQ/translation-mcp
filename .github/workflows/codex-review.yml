@@ -31,8 +31,7 @@ jobs:
         id: codex
         uses: openai/codex-action@v1
         with:
-          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
-          model: "gpt-5-codex"
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           output-file: review-output.md
           prompt: |
             You are a code reviewer. Review the changes in this pull request.
