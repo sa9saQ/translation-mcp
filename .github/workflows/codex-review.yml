@@ -1,6 +1,5 @@
 # Codex Code Review - GitHub Actions
 # セキュリティ・ロジックエラーに特化したAIレビュー
-# CodeRabbitはスタイル・ドキュメントを担当
 
 name: Codex Code Review
 
@@ -8,7 +7,6 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
-# PRへのコメント権限
 permissions:
   contents: read
   pull-requests: write
@@ -16,43 +14,98 @@ permissions:
 jobs:
   codex-review:
     runs-on: ubuntu-latest
-    # Draft PRはスキップ
     if: github.event.pull_request.draft == false
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for better context
+          fetch-depth: 0
+
+      - name: Fetch PR refs
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+          git fetch origin ${{ github.event.pull_request.head.ref }}
 
       - name: Run Codex Code Review
+        id: codex
         uses: openai/codex-action@v1
         with:
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
-          # GPT-5-Codex推奨、コスト重視ならcodex-mini-latest
           model: "gpt-5-codex"
-          task: |
-            Review this pull request focusing on:
+          output-file: review-output.md
+          prompt: |
+            You are a code reviewer. Review the changes in this pull request.
 
-            ## Priority (Codex Focus - CodeRabbit handles style/docs)
+            Focus on:
             - **P0 (Critical)**: Security vulnerabilities, data leaks, authentication bypasses
-            - **P1 (High)**: Logic errors, race conditions, null pointer exceptions, edge cases
-            - **P2 (Medium)**: Performance issues, resource leaks, inefficient algorithms
+            - **P1 (High)**: Logic errors, race conditions, null pointer exceptions
+            - **P2 (Medium)**: Performance issues, resource leaks
 
-            ## Rules
-            - Write all comments in Japanese (日本語でコメント)
+            Rules:
+            - Write all comments in Japanese (日本語)
             - Skip: *.md, *.json, *.lock, node_modules/**, dist/**
-            - Focus only on changed files in this PR
-            - Do NOT comment on code style or formatting (CodeRabbit handles that)
+            - Do NOT comment on code style (CodeRabbit handles that)
+            - If no issues found, say "問題は見つかりませんでした ✅"
 
-            ## Output Format
-            For each issue found:
-            **[P0/P1/P2]** 問題の簡潔な説明
-            **問題箇所**: `ファイル名:行番号`
-            **理由**: なぜこれが問題なのか
-            **修正案**: 具体的な修正方法
+            Output format for each issue:
+            **[P0/P1/P2]** 問題の説明
+            - 📍 ファイル: `filename:line`
+            - 💡 理由: なぜ問題か
+            - 🔧 修正案: 具体的な修正方法
 
-      - name: Post Review Summary
-        if: always()
+            Review the diff between ${{ github.event.pull_request.base.ref }} and ${{ github.event.pull_request.head.ref }}
+
+      - name: Read review output
+        id: review
         run: |
-          echo "Codex review completed for PR #${{ github.event.pull_request.number }}"
+          if [ -f review-output.md ]; then
+            echo "review<<EOF" >> $GITHUB_OUTPUT
+            cat review-output.md >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "review=レビュー出力がありません" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Post review comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const review = `${{ steps.review.outputs.review }}`;
+
+            // Find existing Codex comment
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+
+            const codexComment = comments.data.find(c =>
+              c.body.includes('<!-- codex-review -->')
+            );
+
+            const body = `<!-- codex-review -->
+            ## 🤖 Codex Code Review
+
+            ${review}
+
+            ---
+            *Powered by OpenAI Codex via GitHub Actions*`;
+
+            if (codexComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: codexComment.id,
+                body: body
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
