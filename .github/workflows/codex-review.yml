@@ -1,0 +1,58 @@
+# Codex Code Review - GitHub Actions
+# セキュリティ・ロジックエラーに特化したAIレビュー
+# CodeRabbitはスタイル・ドキュメントを担当
+
+name: Codex Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# PRへのコメント権限
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  codex-review:
+    runs-on: ubuntu-latest
+    # Draft PRはスキップ
+    if: github.event.pull_request.draft == false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better context
+
+      - name: Run Codex Code Review
+        uses: openai/codex-action@v1
+        with:
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          # GPT-5-Codex推奨、コスト重視ならcodex-mini-latest
+          model: "gpt-5-codex"
+          task: |
+            Review this pull request focusing on:
+
+            ## Priority (Codex Focus - CodeRabbit handles style/docs)
+            - **P0 (Critical)**: Security vulnerabilities, data leaks, authentication bypasses
+            - **P1 (High)**: Logic errors, race conditions, null pointer exceptions, edge cases
+            - **P2 (Medium)**: Performance issues, resource leaks, inefficient algorithms
+
+            ## Rules
+            - Write all comments in Japanese (日本語でコメント)
+            - Skip: *.md, *.json, *.lock, node_modules/**, dist/**
+            - Focus only on changed files in this PR
+            - Do NOT comment on code style or formatting (CodeRabbit handles that)
+
+            ## Output Format
+            For each issue found:
+            **[P0/P1/P2]** 問題の簡潔な説明
+            **問題箇所**: `ファイル名:行番号`
+            **理由**: なぜこれが問題なのか
+            **修正案**: 具体的な修正方法
+
+      - name: Post Review Summary
+        if: always()
+        run: |
+          echo "Codex review completed for PR #${{ github.event.pull_request.number }}"
