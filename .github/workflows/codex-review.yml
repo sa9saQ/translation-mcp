@@ -100,13 +100,15 @@ jobs:
               c.body.includes('<!-- ai-code-review -->')
             );
 
-            const body = `<!-- ai-code-review -->
-## 🤖 AI Code Review
-
-${review}
-
----
-*Powered by OpenAI GPT-5.2*`;
+            const body = [
+              '<!-- ai-code-review -->',
+              '## 🤖 AI Code Review',
+              '',
+              review,
+              '',
+              '---',
+              '*Powered by OpenAI GPT-5.2*'
+            ].join('\n');
 
             if (aiComment) {
               await github.rest.issues.updateComment({
