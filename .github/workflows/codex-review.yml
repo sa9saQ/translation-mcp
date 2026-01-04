@@ -48,7 +48,7 @@ jobs:
           PAYLOAD=$(jq -n \
             --arg diff "$DIFF_CONTENT" \
             '{
-              "model": "gpt-4.1",
+              "model": "gpt-5.2",
               "messages": [
                 {
                   "role": "system",
@@ -107,7 +107,7 @@ jobs:
               review,
               '',
               '---',
-              '*Powered by OpenAI GPT-4.1*'
+              '*Powered by OpenAI GPT-5.2*'
             ].join('\n');
 
             if (aiComment) {
