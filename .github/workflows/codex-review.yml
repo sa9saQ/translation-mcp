@@ -27,54 +27,59 @@ jobs:
         run: |
           git fetch origin ${{ github.event.pull_request.base.ref }}
           DIFF=$(git diff origin/${{ github.event.pull_request.base.ref }}...HEAD -- . ':!*.md' ':!*.json' ':!*.lock' ':!node_modules/*' ':!dist/*' ':!*.min.js' | head -c 50000)
-          echo "diff<<EOF" >> $GITHUB_OUTPUT
-          echo "$DIFF" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo 'content<<EOF'
+            echo "$DIFF"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: AI Code Review
         id: review
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DIFF_CONTENT: ${{ steps.diff.outputs.content }}
         run: |
-          DIFF='${{ steps.diff.outputs.diff }}'
-
-          if [ -z "$DIFF" ]; then
-            echo "review=レビュー対象のコード変更がありません ✅" >> $GITHUB_OUTPUT
+          if [ -z "$DIFF_CONTENT" ]; then
+            echo "result=レビュー対象のコード変更がありません ✅" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+
+          # Escape for JSON
+          ESCAPED_DIFF=$(echo "$DIFF_CONTENT" | jq -Rs .)
 
           RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $OPENAI_API_KEY" \
-            -d @- << EOF
-          {
-            "model": "gpt-5.2",
-            "messages": [
-              {
-                "role": "system",
-                "content": "あなたはコードレビュアーです。セキュリティと重大なロジックエラーのみに焦点を当ててレビューしてください。\n\n優先度:\n- P0: セキュリティ脆弱性、認証バイパス、データ漏洩\n- P1: ロジックエラー、レースコンディション、nullポインタ\n- P2: パフォーマンス問題\n\nルール:\n- 日本語でコメント\n- スタイルやフォーマットは無視（CodeRabbitが担当）\n- 問題がなければ「問題は見つかりませんでした ✅」と回答\n\n出力形式:\n**[P0/P1/P2]** 問題の説明\n- 📍 ファイル:行番号\n- 💡 理由\n- 🔧 修正案"
-              },
-              {
-                "role": "user",
-                "content": "以下のdiffをレビューしてください:\n\n$DIFF"
-              }
-            ],
-            "max_tokens": 2000
-          }
-          EOF
-          )
+            -d '{
+              "model": "gpt-5.2",
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "あなたはコードレビュアーです。セキュリティと重大なロジックエラーのみに焦点を当ててレビューしてください。\n\n優先度:\n- P0: セキュリティ脆弱性、認証バイパス、データ漏洩\n- P1: ロジックエラー、レースコンディション、nullポインタ\n- P2: パフォーマンス問題\n\nルール:\n- 日本語でコメント\n- スタイルやフォーマットは無視（CodeRabbitが担当）\n- 問題がなければ「問題は見つかりませんでした ✅」と回答\n\n出力形式:\n**[P0/P1/P2]** 問題の説明\n- 📍 ファイル:行番号\n- 💡 理由\n- 🔧 修正案"
+                },
+                {
+                  "role": "user",
+                  "content": '"$ESCAPED_DIFF"'
+                }
+              ],
+              "max_tokens": 2000
+            }')
 
           REVIEW=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // "レビュー生成に失敗しました"')
 
-          echo "review<<EOF" >> $GITHUB_OUTPUT
-          echo "$REVIEW" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo 'result<<EOF'
+            echo "$REVIEW"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Post review comment
         uses: actions/github-script@v7
+        env:
+          REVIEW_RESULT: ${{ steps.review.outputs.result }}
         with:
           script: |
-            const review = `${{ steps.review.outputs.review }}`;
+            const review = process.env.REVIEW_RESULT || 'レビュー結果がありません';
 
             const comments = await github.rest.issues.listComments({
               owner: context.repo.owner,
@@ -87,12 +92,12 @@ jobs:
             );
 
             const body = `<!-- ai-code-review -->
-## 🤖 AI Code Review
+            ## 🤖 AI Code Review
 
-${review}
+            ${review}
 
----
-*Powered by OpenAI GPT-4o*`;
+            ---
+            *Powered by OpenAI GPT-5.2*`;
 
             if (aiComment) {
               await github.rest.issues.updateComment({
