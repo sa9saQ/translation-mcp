@@ -48,7 +48,7 @@ jobs:
           PAYLOAD=$(jq -n \
             --arg diff "$DIFF_CONTENT" \
             '{
-              "model": "gpt-4o",
+              "model": "gpt-5-codex",
               "messages": [
                 {
                   "role": "system",
@@ -106,7 +106,7 @@ jobs:
 ${review}
 
 ---
-*Powered by OpenAI GPT-4o*`;
+*Powered by OpenAI GPT-5-Codex*`;
 
             if (aiComment) {
               await github.rest.issues.updateComment({
