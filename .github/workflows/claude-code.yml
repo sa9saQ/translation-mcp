@@ -1,0 +1,177 @@
+# Claude Code GitHub Action Template
+# PRの自動レビュー、Issue対応、セキュリティ監査
+
+name: Claude Code Automation
+
+on:
+  # PRへのコメント（@claude mentionで発火）
+  issue_comment:
+    types: [created]
+
+  # PR作成/更新時
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+  # Issue割り当て時
+  issues:
+    types: [assigned]
+
+  # 手動トリガー
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Task for Claude to perform'
+        required: true
+        type: string
+
+# 権限設定
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  # @claude mention対応
+  respond-to-mention:
+    if: >
+      github.event_name == 'issue_comment' &&
+      contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Code Response
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          mode: auto
+          allowed_tools: |
+            Read
+            Write
+            Edit
+            Bash
+            Grep
+            Glob
+
+  # PR自動レビュー
+  auto-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review this pull request thoroughly:
+            1. Check for security vulnerabilities (OWASP Top 10)
+            2. Verify code quality and best practices
+            3. Look for potential bugs and edge cases
+            4. Suggest improvements
+
+            Provide a structured review with:
+            - Summary
+            - Security issues (CRITICAL/HIGH/MEDIUM/LOW)
+            - Code quality issues
+            - Suggestions
+          mode: review
+          allowed_tools: |
+            Read
+            Grep
+            Glob
+
+  # セキュリティ監査
+  security-audit:
+    if: >
+      github.event_name == 'pull_request' &&
+      contains(github.event.pull_request.title, '[security]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Security Audit
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Perform a comprehensive security audit:
+            1. OWASP Top 10 vulnerability scan
+            2. Authentication/Authorization review
+            3. Input validation check
+            4. Secrets/credentials detection
+            5. Dependency vulnerability assessment
+
+            Rate each finding: CRITICAL/HIGH/MEDIUM/LOW
+            Provide remediation steps for each issue.
+          mode: review
+          allowed_tools: |
+            Read
+            Grep
+            Glob
+            Bash
+
+  # Issue自動実装
+  auto-implement:
+    if: >
+      github.event_name == 'issues' &&
+      github.event.action == 'assigned' &&
+      github.event.assignee.login == 'claude-code[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Code Implementation
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Implement the feature/fix described in this issue.
+
+            Follow these guidelines:
+            1. Read existing code patterns
+            2. Write tests first (TDD)
+            3. Implement the solution
+            4. Run tests to verify
+            5. Create a PR with the changes
+          mode: implement
+          allowed_tools: |
+            Read
+            Write
+            Edit
+            Bash
+            Grep
+            Glob
+          create_pr: true
+
+  # 手動タスク実行
+  manual-task:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Code Task
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: ${{ github.event.inputs.task }}
+          mode: auto
+          allowed_tools: |
+            Read
+            Write
+            Edit
+            Bash
+            Grep
+            Glob
