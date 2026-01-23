@@ -57,6 +57,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: "--model claude-opus-4-5-20251101"
           mode: auto
           allowed_tools: |
             Read
@@ -87,6 +88,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: "--model claude-opus-4-5-20251101"
           prompt: |
             # Comprehensive Code Review
 
@@ -276,6 +278,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: "--model claude-opus-4-5-20251101"
           prompt: |
             # Deep Security Audit
 
@@ -408,6 +411,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: "--model claude-opus-4-5-20251101"
           prompt: |
             Implement the feature/fix described in this issue.
 
@@ -442,6 +446,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: "--model claude-opus-4-5-20251101"
           prompt: |
             Task: ${{ github.event.inputs.task }}
             Review Type: ${{ github.event.inputs.review_type }}
