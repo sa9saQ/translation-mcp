@@ -1,0 +1,457 @@
+# Claude Code GitHub Action Template
+# PRの自動レビュー、Issue対応、セキュリティ監査（強化版）
+
+name: Claude Code Automation
+
+on:
+  # PRへのコメント（@claude mentionで発火）
+  issue_comment:
+    types: [created]
+
+  # PR作成/更新時
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+  # Issue割り当て時
+  issues:
+    types: [assigned]
+
+  # 手動トリガー
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Task for Claude to perform'
+        required: true
+        type: string
+      review_type:
+        description: 'Review type'
+        required: false
+        type: choice
+        options:
+          - full
+          - security
+          - maintainability
+          - quick
+        default: full
+
+# 権限設定
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  security-events: write
+
+jobs:
+  # @claude mention対応
+  respond-to-mention:
+    if: >
+      github.event_name == 'issue_comment' &&
+      contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Code Response
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          mode: auto
+          allowed_tools: |
+            Read
+            Write
+            Edit
+            Bash
+            Grep
+            Glob
+
+  # PR包括的レビュー（強化版）
+  comprehensive-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed
+        run: |
+          FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | head -100)
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Claude Comprehensive Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            # Comprehensive Code Review
+
+            Perform a thorough multi-dimensional review of this PR.
+            Changed files: ${{ steps.changed.outputs.files }}
+
+            ## 1. SECURITY ANALYSIS (CRITICAL)
+
+            ### OWASP Top 10 2021 Check:
+            - [ ] A01: Broken Access Control - unauthorized access, privilege escalation
+            - [ ] A02: Cryptographic Failures - weak encryption, exposed secrets
+            - [ ] A03: Injection - SQL, NoSQL, OS command, LDAP injection
+            - [ ] A04: Insecure Design - missing threat modeling, security patterns
+            - [ ] A05: Security Misconfiguration - default configs, unnecessary features
+            - [ ] A06: Vulnerable Components - outdated dependencies, known CVEs
+            - [ ] A07: Auth Failures - broken auth, session management
+            - [ ] A08: Data Integrity Failures - unsigned data, insecure deserialization
+            - [ ] A09: Logging Failures - missing audit logs, log injection
+            - [ ] A10: SSRF - server-side request forgery
+
+            ### Additional Security Checks:
+            - Hardcoded secrets/credentials (API keys, passwords, tokens)
+            - Unsafe regex (ReDoS vulnerability)
+            - Path traversal vulnerabilities
+            - XSS (Cross-Site Scripting) vectors
+            - CSRF protection
+            - Rate limiting for public endpoints
+            - Input sanitization and validation
+
+            ## 2. BUG & ERROR ANALYSIS
+
+            ### Logic Errors:
+            - Off-by-one errors
+            - Null/undefined reference handling
+            - Race conditions and concurrency issues
+            - Infinite loops or recursion
+            - Incorrect boolean logic
+            - Edge case handling (empty arrays, null, boundaries)
+
+            ### Error Handling:
+            - Uncaught exceptions
+            - Missing try-catch blocks
+            - Silent failures (catch with no action)
+            - Error message information leakage
+            - Proper error propagation
+
+            ### Type Safety:
+            - Type coercion issues
+            - Unsafe type assertions
+            - Missing null checks
+            - any/unknown type abuse
+
+            ## 3. MAINTAINABILITY ANALYSIS
+
+            ### Code Complexity:
+            - Cyclomatic complexity > 10 (flag functions)
+            - Deeply nested code (> 3 levels)
+            - Long functions (> 50 lines)
+            - Large files (> 500 lines)
+            - God classes/modules
+
+            ### Code Quality:
+            - DRY violations (duplicated code)
+            - SOLID principle violations
+            - Unclear naming conventions
+            - Magic numbers/strings
+            - Dead code
+            - TODO/FIXME/HACK comments
+
+            ### Readability:
+            - Missing or outdated documentation
+            - Complex expressions without explanation
+            - Inconsistent coding style
+            - Confusing control flow
+
+            ## 4. VULNERABILITY ASSESSMENT
+
+            ### Dependency Security:
+            - Known vulnerable packages
+            - Outdated dependencies with security patches
+            - Unnecessary dependencies (attack surface)
+            - License compatibility issues
+
+            ### Data Protection:
+            - PII/sensitive data exposure
+            - Insufficient data validation
+            - Missing encryption for sensitive data
+            - Insecure data transmission
+
+            ## 5. MAINTENANCE QUALITY
+
+            ### Test Coverage:
+            - Missing unit tests for new code
+            - Missing edge case tests
+            - Broken or flaky tests
+            - Test quality (assertions, mocking)
+
+            ### Documentation:
+            - Missing API documentation
+            - Outdated README
+            - Missing inline comments for complex logic
+            - Changelog updates needed
+
+            ### Technical Debt:
+            - Workarounds that should be refactored
+            - Deprecated API usage
+            - Performance anti-patterns
+            - Scalability concerns
+
+            ---
+
+            ## OUTPUT FORMAT
+
+            ```
+            ## 🔒 Security Report
+            | Severity | Issue | Location | CWE | Remediation |
+            |----------|-------|----------|-----|-------------|
+            | CRITICAL | ... | file:line | CWE-XXX | ... |
+            | HIGH | ... | ... | ... | ... |
+
+            ## 🐛 Bug Report
+            | Priority | Issue | Location | Impact | Fix |
+            |----------|-------|----------|--------|-----|
+            | P0 | ... | file:line | ... | ... |
+
+            ## 🔧 Maintainability Report
+            | Category | Issue | Location | Suggestion |
+            |----------|-------|----------|------------|
+            | Complexity | ... | ... | ... |
+
+            ## 📦 Dependency Report
+            | Package | Current | Issue | Action |
+            |---------|---------|-------|--------|
+
+            ## 📊 Summary
+            - Security Score: X/10
+            - Bug Risk: X/10
+            - Maintainability: X/10
+            - Test Coverage: X%
+            - Overall: ✅ APPROVED / ⚠️ NEEDS WORK / ❌ BLOCKED
+
+            ## 🚨 All Critical Issues (MUST FIX)
+            List ALL critical issues found. Do not limit.
+
+            ## ⚠️ All High Priority Issues
+            List ALL high priority issues found. Do not limit.
+
+            ## 📝 All Medium Priority Issues
+            List ALL medium priority issues found. Do not limit.
+
+            ## 💡 Low Priority / Suggestions
+            List ALL low priority issues and suggestions. Do not limit.
+            ```
+
+            IMPORTANT: Output ALL findings in each category. Do NOT limit to top 3 or any number.
+            Every security issue, bug, and maintainability concern must be reported.
+            If no issues found in a category, state "✅ No issues found"
+          mode: review
+          allowed_tools: |
+            Read
+            Grep
+            Glob
+            Bash
+
+  # セキュリティ特化監査
+  security-audit:
+    if: >
+      github.event_name == 'pull_request' &&
+      (contains(github.event.pull_request.title, '[security]') ||
+       contains(github.event.pull_request.labels.*.name, 'security'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run npm audit
+        id: npm_audit
+        continue-on-error: true
+        run: |
+          if [ -f package.json ]; then
+            npm audit --json > npm-audit.json 2>/dev/null || true
+            echo "has_npm=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Claude Security Audit
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            # Deep Security Audit
+
+            Perform a comprehensive security audit simulating an attacker's perspective.
+
+            ## Phase 1: Attack Surface Analysis
+            - Identify all entry points (APIs, forms, file uploads)
+            - Map authentication and authorization flows
+            - Identify data flows and trust boundaries
+
+            ## Phase 2: Vulnerability Hunting
+
+            ### Authentication & Session
+            - Weak password policies
+            - Session fixation/hijacking
+            - JWT vulnerabilities (none algorithm, weak secrets)
+            - OAuth/OIDC misconfigurations
+            - Remember me functionality issues
+
+            ### Authorization
+            - IDOR (Insecure Direct Object Reference)
+            - Horizontal/Vertical privilege escalation
+            - Missing function-level access control
+            - Role bypass vulnerabilities
+
+            ### Injection Attacks
+            - SQL Injection (all variants)
+            - NoSQL Injection
+            - Command Injection
+            - LDAP Injection
+            - XPath Injection
+            - Template Injection (SSTI)
+            - Header Injection
+
+            ### Client-Side
+            - XSS (Stored, Reflected, DOM-based)
+            - CSRF
+            - Clickjacking
+            - Open Redirects
+            - PostMessage vulnerabilities
+
+            ### Server-Side
+            - SSRF
+            - XXE (XML External Entity)
+            - Deserialization vulnerabilities
+            - File inclusion (LFI/RFI)
+            - Path traversal
+
+            ### Cryptography
+            - Weak algorithms (MD5, SHA1, DES)
+            - Insufficient key lengths
+            - Predictable random values
+            - Missing encryption
+            - Certificate validation issues
+
+            ### Business Logic
+            - Race conditions
+            - Price manipulation
+            - Quantity tampering
+            - Workflow bypass
+            - Time-of-check to time-of-use (TOCTOU)
+
+            ## Phase 3: Secrets Scan
+            - API keys in code
+            - Database credentials
+            - Private keys
+            - Cloud provider secrets
+            - Environment variable leakage
+
+            ## Phase 4: Dependency Analysis
+            ${{ steps.npm_audit.outputs.has_npm == 'true' && 'Review npm-audit.json for known vulnerabilities' || 'No npm audit available' }}
+
+            ---
+
+            ## OUTPUT FORMAT
+
+            ```
+            # 🛡️ Security Audit Report
+
+            ## Executive Summary
+            - Critical Findings: X
+            - High Findings: X
+            - Total Risk Score: X/100
+
+            ## Detailed Findings
+
+            ### [CRITICAL] Finding Title
+            - **CWE**: CWE-XXX
+            - **CVSS**: X.X
+            - **Location**: file:line
+            - **Description**: ...
+            - **Proof of Concept**: (if applicable)
+            - **Impact**: ...
+            - **Remediation**: ...
+            - **References**: ...
+
+            ## Attack Scenarios
+            1. Scenario: ...
+               Steps: ...
+               Impact: ...
+
+            ## Remediation Priority
+            1. [CRITICAL] Fix immediately: ...
+            2. [HIGH] Fix within 24h: ...
+            3. [MEDIUM] Fix within 1 week: ...
+
+            ## Security Hardening Recommendations
+            - ...
+            ```
+          mode: review
+          allowed_tools: |
+            Read
+            Grep
+            Glob
+            Bash
+
+  # Issue自動実装
+  auto-implement:
+    if: >
+      github.event_name == 'issues' &&
+      github.event.action == 'assigned' &&
+      github.event.assignee.login == 'claude-code[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Code Implementation
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Implement the feature/fix described in this issue.
+
+            Follow these guidelines:
+            1. Read existing code patterns and style
+            2. Write tests first (TDD approach)
+            3. Implement the solution with security in mind
+            4. Add proper error handling
+            5. Update documentation if needed
+            6. Run tests to verify
+            7. Create a PR with detailed description
+          mode: implement
+          allowed_tools: |
+            Read
+            Write
+            Edit
+            Bash
+            Grep
+            Glob
+          create_pr: true
+
+  # 手動タスク実行
+  manual-task:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Code Task
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Task: ${{ github.event.inputs.task }}
+            Review Type: ${{ github.event.inputs.review_type }}
+
+            Execute the requested task with appropriate thoroughness based on review type.
+          mode: auto
+          allowed_tools: |
+            Read
+            Write
+            Edit
+            Bash
+            Grep
+            Glob
