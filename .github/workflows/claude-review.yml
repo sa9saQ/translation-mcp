@@ -40,6 +40,7 @@ permissions:
   pull-requests: write
   issues: write
   security-events: write
+  id-token: write
 
 jobs:
   # @claude mention対応
@@ -58,14 +59,6 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_args: "--model claude-opus-4-5-20251101"
-          mode: auto
-          allowed_tools: |
-            Read
-            Write
-            Edit
-            Bash
-            Grep
-            Glob
 
   # PR包括的レビュー（強化版）
   comprehensive-review:
@@ -246,12 +239,6 @@ jobs:
             IMPORTANT: Output ALL findings in each category. Do NOT limit to top 3 or any number.
             Every security issue, bug, and maintainability concern must be reported.
             If no issues found in a category, state "✅ No issues found"
-          mode: review
-          allowed_tools: |
-            Read
-            Grep
-            Glob
-            Bash
 
   # セキュリティ特化監査
   security-audit:
@@ -388,12 +375,6 @@ jobs:
             ## Security Hardening Recommendations
             - ...
             ```
-          mode: review
-          allowed_tools: |
-            Read
-            Grep
-            Glob
-            Bash
 
   # Issue自動実装
   auto-implement:
@@ -423,15 +404,6 @@ jobs:
             5. Update documentation if needed
             6. Run tests to verify
             7. Create a PR with detailed description
-          mode: implement
-          allowed_tools: |
-            Read
-            Write
-            Edit
-            Bash
-            Grep
-            Glob
-          create_pr: true
 
   # 手動タスク実行
   manual-task:
@@ -452,11 +424,3 @@ jobs:
             Review Type: ${{ github.event.inputs.review_type }}
 
             Execute the requested task with appropriate thoroughness based on review type.
-          mode: auto
-          allowed_tools: |
-            Read
-            Write
-            Edit
-            Bash
-            Grep
-            Glob
