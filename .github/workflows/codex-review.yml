@@ -1,11 +1,12 @@
 # Codex Code Review - OpenAI GPT-5.2-Codex
-# OpenAI API を直接使用したコードレビュー
+# OpenAI Responses API を使用したコードレビュー
 #
 # 使い方:
 # 1. このファイルを .github/workflows/codex-review.yml にコピー
 # 2. リポジトリのSecrets に OPENAI_API_KEY を設定
 #
 # モデル: gpt-5.2-codex (最新コーディング特化モデル)
+# API: Responses API (/v1/responses)
 
 name: Codex Code Review
 
@@ -65,26 +66,19 @@ jobs:
           # Decode diff
           DIFF_CONTENT=$(echo "$DIFF_ENCODED" | base64 -d)
 
-          # Build JSON payload using jq
+          # Build JSON payload for Responses API
           PAYLOAD=$(jq -n \
             --arg diff "$DIFF_CONTENT" \
             '{
               "model": "gpt-5.2-codex",
-              "messages": [
-                {
-                  "role": "system",
-                  "content": "あなたはコードレビュアーです。以下の観点でレビューしてください：\n\n## レビュー観点\n1. **バグ・論理エラー** - 潜在的なバグ、エッジケース、競合状態\n2. **セキュリティ** - OWASP Top 10、インジェクション、認証/認可の問題\n3. **パフォーマンス** - N+1クエリ、不要なループ、メモリリーク\n4. **保守性** - DRY違反、複雑すぎるロジック\n\n## ルール\n- 日本語でコメント\n- 重要な問題のみ指摘（軽微な問題は省略）\n- スタイルやフォーマットは無視\n\n## 出力形式\n```\n## 🔴 Critical (修正必須)\n- [問題] (ファイル:行番号)\n\n## 🟡 Warning (推奨修正)\n- [問題] (ファイル:行番号)\n\n## ✅ 総合評価\n承認 / 要修正 / ブロック\n```\n\n問題がなければ「問題は見つかりませんでした ✅」と回答"
-                },
-                {
-                  "role": "user",
-                  "content": ("以下のコード差分をレビューしてください：\n\n" + $diff)
-                }
-              ],
-              "max_tokens": 2000
+              "instructions": "あなたはコードレビュアーです。以下の観点でレビューしてください：\n\n## レビュー観点\n1. **バグ・論理エラー** - 潜在的なバグ、エッジケース、競合状態\n2. **セキュリティ** - OWASP Top 10、インジェクション、認証/認可の問題\n3. **パフォーマンス** - N+1クエリ、不要なループ、メモリリーク\n4. **保守性** - DRY違反、複雑すぎるロジック\n\n## ルール\n- 日本語でコメント\n- 重要な問題のみ指摘（軽微な問題は省略）\n- スタイルやフォーマットは無視\n\n## 出力形式\n```\n## 🔴 Critical (修正必須)\n- [問題] (ファイル:行番号)\n\n## 🟡 Warning (推奨修正)\n- [問題] (ファイル:行番号)\n\n## ✅ 総合評価\n承認 / 要修正 / ブロック\n```\n\n問題がなければ「問題は見つかりませんでした ✅」と回答",
+              "input": ("以下のコード差分をレビューしてください：\n\n" + $diff),
+              "reasoning": {"effort": "medium"},
+              "max_output_tokens": 2000
             }')
 
-          # Call OpenAI API
-          RESPONSE=$(curl -s -w "\n%{http_code}" https://api.openai.com/v1/chat/completions \
+          # Call OpenAI Responses API
+          RESPONSE=$(curl -s -w "\n%{http_code}" https://api.openai.com/v1/responses \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $OPENAI_API_KEY" \
             -d "$PAYLOAD")
@@ -100,8 +94,9 @@ jobs:
             exit 0
           fi
 
-          # Extract review content
-          REVIEW=$(echo "$BODY" | jq -r '.choices[0].message.content // "レビュー生成に失敗しました"')
+          # Extract review content from Responses API format
+          # The response has output array with content items
+          REVIEW=$(echo "$BODY" | jq -r '.output[0].content[0].text // .output_text // "レビュー生成に失敗しました"')
 
           # Save to file to preserve formatting
           echo "$REVIEW" > /tmp/review_result.txt
@@ -134,7 +129,7 @@ jobs:
               review,
               '',
               '---',
-              '*Powered by OpenAI GPT-5.2-Codex*'
+              '*Powered by OpenAI GPT-5.2-Codex via Responses API*'
             ].join('\n');
 
             await github.rest.issues.createComment({
