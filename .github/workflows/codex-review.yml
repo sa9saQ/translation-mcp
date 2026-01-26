@@ -1,11 +1,11 @@
-# Codex Code Review - OpenAI GPT-5.2
+# Codex Code Review - OpenAI GPT-4o
 # OpenAI API を直接使用したコードレビュー
 #
 # 使い方:
 # 1. このファイルを .github/workflows/codex-review.yml にコピー
 # 2. リポジトリのSecrets に OPENAI_API_KEY を設定
 #
-# モデル: gpt-5.2 (コーディング特化)
+# モデル: gpt-4o (最新の高性能モデル)
 
 name: Codex Code Review
 
@@ -43,7 +43,6 @@ jobs:
             echo "content=" >> "$GITHUB_OUTPUT"
             echo "has_diff=false" >> "$GITHUB_OUTPUT"
           else
-            # Base64 encode to preserve special characters
             ENCODED=$(echo "$DIFF" | base64 -w 0)
             echo "content=$ENCODED" >> "$GITHUB_OUTPUT"
             echo "has_diff=true" >> "$GITHUB_OUTPUT"
@@ -56,16 +55,13 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DIFF_ENCODED: ${{ steps.diff.outputs.content }}
         run: |
-          # Check if API key is set
           if [ -z "$OPENAI_API_KEY" ]; then
             echo "result=⚠️ OPENAI_API_KEY が設定されていません。リポジトリのSecretsを確認してください。" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Decode diff
           DIFF_CONTENT=$(echo "$DIFF_ENCODED" | base64 -d)
 
-          # Build JSON payload using jq
           PAYLOAD=$(jq -n \
             --arg diff "$DIFF_CONTENT" \
             '{
@@ -83,27 +79,21 @@ jobs:
               "max_tokens": 2000
             }')
 
-          # Call OpenAI API
           RESPONSE=$(curl -s -w "\n%{http_code}" https://api.openai.com/v1/chat/completions \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $OPENAI_API_KEY" \
             -d "$PAYLOAD")
 
-          # Extract HTTP status code
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
 
-          # Handle errors
           if [ "$HTTP_CODE" != "200" ]; then
             ERROR_MSG=$(echo "$BODY" | jq -r '.error.message // "Unknown API error"')
             echo "result=⚠️ API エラー ($HTTP_CODE): $ERROR_MSG" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Extract review content
           REVIEW=$(echo "$BODY" | jq -r '.choices[0].message.content // "レビュー生成に失敗しました"')
-
-          # Save to file to preserve formatting
           echo "$REVIEW" > /tmp/review_result.txt
 
           {
