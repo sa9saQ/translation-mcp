@@ -1,0 +1,73 @@
+# Codex Code Review - GPT-5.2-Codex
+# OpenAI公式アクションを使用した高精度コードレビュー
+#
+# モデル: gpt-5.2-codex (コーディング特化、バグ検出最強)
+# API: Responses API
+
+name: Codex Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  codex-review:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          fetch-depth: 0
+
+      - name: Fetch base and head refs
+        run: |
+          git fetch --no-tags origin \
+            ${{ github.event.pull_request.base.ref }} \
+            +refs/pull/${{ github.event.pull_request.number }}/head
+
+      - name: Codex Review
+        id: codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt: |
+            PR #${{ github.event.pull_request.number }} for ${{ github.repository }} をレビューしてください。
+
+            ## レビュー観点
+            1. **バグ・論理エラー** - 潜在的なバグ、エッジケース、競合状態
+            2. **セキュリティ** - OWASP Top 10、インジェクション、認証/認可の問題
+            3. **パフォーマンス** - N+1クエリ、不要なループ、メモリリーク
+            4. **保守性** - DRY違反、複雑すぎるロジック、命名規則
+
+            ## 出力形式
+            重要な問題のみ指摘してください。軽微な問題は省略。
+
+            ```
+            ## 🔴 Critical (修正必須)
+            - [問題] (ファイル:行番号)
+
+            ## 🟡 Warning (推奨修正)
+            - [問題] (ファイル:行番号)
+
+            ## ✅ 総合評価
+            承認 / 要修正 / ブロック
+            ```
+
+      - name: Post Review Comment
+        if: steps.codex.outputs.final-message != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const message = `### 🤖 Codex Code Review (GPT-5.2-Codex)\n\n${{ steps.codex.outputs.final-message }}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: message
+            });
