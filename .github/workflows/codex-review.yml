@@ -95,8 +95,21 @@ jobs:
           fi
 
           # Extract review content from Responses API format
-          # The response has output array with content items
-          REVIEW=$(echo "$BODY" | jq -r '.output[0].content[0].text // .output_text // "レビュー生成に失敗しました"')
+          REVIEW=$(echo "$BODY" | jq -r '
+            .output_text //
+            .output[0].content[0].text //
+            (.output[] | select(.type == "message") | .content[0].text) //
+            empty
+          ' 2>/dev/null)
+
+          # Fallback: recursive text extraction
+          if [ -z "$REVIEW" ]; then
+            REVIEW=$(echo "$BODY" | jq -r '.. | objects | select(has("text")) | .text' 2>/dev/null | head -1)
+          fi
+
+          if [ -z "$REVIEW" ]; then
+            REVIEW="レビュー生成に失敗しました"
+          fi
 
           # Save to file to preserve formatting
           echo "$REVIEW" > /tmp/review_result.txt
