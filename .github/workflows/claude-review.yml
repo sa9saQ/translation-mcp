@@ -1,8 +1,8 @@
-# Claude Code GitHub Action - 自動レビュー版
-# PRオープン時に自動レビュー + @claudeで追加対応
+# Claude Code GitHub Action - シンプル版
+# @claude mentionで応答、プラグインなし
 #
 # 使い方:
-# 1. このファイルを .github/workflows/claude-review.yml にコピー
+# 1. このファイルを .github/workflows/claude.yml にコピー
 # 2. リポジトリのSecrets に ANTHROPIC_API_KEY を設定
 
 name: Claude Code Review
@@ -22,33 +22,9 @@ permissions:
   id-token: write
 
 jobs:
-  # PRオープン/更新時の自動レビュー
-  auto-review:
+  claude:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          direct_prompt: |
-            このPRをレビューしてください。以下の観点で確認してください：
-            1. バグや論理エラー
-            2. セキュリティ上の問題
-            3. パフォーマンスの問題
-            4. コードの可読性
-
-            重要な問題があれば指摘し、軽微な問題は省略してください。
-
-  # @claudeメンション時の対応
-  mention-response:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    if: github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment'
     steps:
       - uses: actions/checkout@v4
         with:
