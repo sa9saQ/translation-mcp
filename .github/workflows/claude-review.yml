@@ -1,27 +1,17 @@
-# Claude Code GitHub Action Template
-# PRの自動レビュー、@claude mention対応
+# Claude Code GitHub Action - 自動レビュー版
+# PRオープン時に自動レビュー + @claudeで追加対応
 #
 # 使い方:
-# 1. このファイルを .github/workflows/claude.yml にコピー
+# 1. このファイルを .github/workflows/claude-review.yml にコピー
 # 2. リポジトリのSecrets に ANTHROPIC_API_KEY を設定
-#
-# 設定手順:
-# - Settings → Secrets and variables → Actions → New repository secret
-# - Name: ANTHROPIC_API_KEY
-# - Value: sk-ant-api03-... (Anthropic APIキー)
 
 name: Claude Code Review
 
 on:
-  # PR作成/更新時に自動レビュー
   pull_request:
     types: [opened, synchronize, reopened]
-
-  # PRコメントで @claude mention
   issue_comment:
     types: [created]
-
-  # Issueコメントで @claude mention
   pull_request_review_comment:
     types: [created]
 
@@ -29,60 +19,42 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  id-token: write
 
 jobs:
-  # PR自動レビュー
-  review:
+  # PRオープン/更新時の自動レビュー
+  auto-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Claude Code Review
-        uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          model: claude-opus-4-5-20251101
+          direct_prompt: |
+            このPRをレビューしてください。以下の観点で確認してください：
+            1. バグや論理エラー
+            2. セキュリティ上の問題
+            3. パフォーマンスの問題
+            4. コードの可読性
 
-  # @claude mention対応（PRコメント）
-  respond-pr-comment:
-    if: |
-      github.event_name == 'issue_comment' &&
-      github.event.issue.pull_request &&
-      contains(github.event.comment.body, '@claude')
+            重要な問題があれば指摘し、軽微な問題は省略してください。
+
+  # @claudeメンション時の対応
+  mention-response:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
+    if: github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment'
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Claude Code Response
-        uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          model: claude-opus-4-5-20251101
-
-  # @claude mention対応（レビューコメント）
-  respond-review-comment:
-    if: |
-      github.event_name == 'pull_request_review_comment' &&
-      contains(github.event.comment.body, '@claude')
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Claude Code Response
-        uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          model: claude-opus-4-5-20251101
+          trigger_phrase: "@claude"
