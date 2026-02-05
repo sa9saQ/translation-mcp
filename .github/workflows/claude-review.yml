@@ -1,9 +1,11 @@
-# Claude Code GitHub Action - シンプル版
-# @claude mentionで応答、プラグインなし
+# Claude Code GitHub Action v1
+# @claude mentionで応答 + PR自動レビュー
 #
 # 使い方:
-# 1. このファイルを .github/workflows/claude.yml にコピー
+# 1. このファイルを .github/workflows/claude-review.yml にコピー
 # 2. リポジトリのSecrets に ANTHROPIC_API_KEY を設定
+#
+# v1変更点: trigger_phrase廃止、自動モード検出
 
 name: Claude Code Review
 
@@ -33,4 +35,3 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          trigger_phrase: "@claude"
